@@ -1,32 +1,34 @@
-const cors = require("cors");
-const connect = require("./Config/db");
-const express = require("express");
+const connection = require("./Config/db");
+require("dotenv").config();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const express = require("express");
+const cors = require("cors");
 const UserModel = require("./Models/User.model");
-const CalRouter = require("./Routes/cal.route");
-const authorization = require("./middlewares/authorization");
-require("dotenv").config();
+const JobModel = require("./Models/job.models");
+const { Router } = require("express");
+
 const app = express();
 app.use(express.json());
 app.use(cors());
+
 app.get("/", (req, res) => {
-  res.send("hello");
+  res.send("Welcome HomePAge");
 });
 
+//Signup User
 app.post("/signup", async (req, res) => {
-  const { username, email, password } = req.body;
+  const { fullname, email, password, role } = req.body;
   const isUser = await UserModel.findOne({ email });
-  console.log(isUser)
+  // res.send(req.body)
   if (isUser) {
     res.send({ msg: "Users already exists" });
   } else {
     bcrypt.hash(password, 4, async function (err, hash) {
       if (err) {
-        res.send({ msg: "Something went wrong" });
+        res.send({ msg: "Something went wrong  " });
       }
-      const new_user = new UserModel({ username, email, password: hash });
-      console.log(new_user)
+      const new_user = new UserModel({ fullname, email, password: hash, role });
       try {
         await new_user.save();
         res.send({ msg: "Signup Successfull" });
@@ -37,6 +39,7 @@ app.post("/signup", async (req, res) => {
   }
 });
 
+//Login User
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
   const user = await UserModel.findOne({ email });
@@ -54,22 +57,42 @@ app.post("/login", async (req, res) => {
     }
   });
 });
-app.post("/profile", authorization, async (req, res) => {
-  let _id = req.body.user_id;
-  let user = await UserModel.find(_id);
-  res.send(user);
+
+// GET JOB
+// /jobs?search=Masai
+// /jobs?location=Mumbai
+app.get("/jobs", async (req, res) => {
+  const { company, location, contract } = req.query;
+  if (company != undefined) {
+    const Jobs = await JobModel.find({ company: company });
+    res.send(Jobs);
+  } else if (location != undefined) {
+    const Jobs = await JobModel.find({ location: location });
+    res.send(Jobs);
+  } else if (contract != undefined) {
+    const Jobs = await JobModel.find({ contract: contract });
+    res.send(Jobs);
+  } else {
+    const Jobs = await JobModel.find({});
+    res.send(Jobs);
+  }
+  // app.use("/jobs",jobs)
 });
 
-app.use(authorization);
-app.use("/user", CalRouter);
+//JOB POST
+app.post("/admin", async (req, res) => {
+  const addjobs = new JobModel(req.body);
+  await addjobs.save();
+  res.send("added");
+});
 
-
-app.listen(process.env.PORT, async (req, res) => {
+app.listen(process.env.PORT || 8080, async () => {
   try {
-    await connect;
-    console.log("Connected on port http://localhost:8080");
+    await connection;
+    console.log("Database Connected");
   } catch (error) {
-    console.log("connection failed");
+    console.log("Not able to connect with Database");
     console.log(error);
   }
+  console.log(`Server started at ${process.env.PORT}`);
 });
